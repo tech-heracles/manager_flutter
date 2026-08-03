@@ -55,3 +55,4 @@ windows/
 test/
 
 lib/firebase_options.dart
+test/widget_test.dart

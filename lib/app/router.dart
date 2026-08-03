@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/signup_screen.dart';
 import '../features/auth/presentation/access_denied_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 
@@ -32,6 +33,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final appUserAsync = ref.read(currentAppUserProvider);
       final loggingIn = state.matchedLocation == '/login';
+      final signingUp = state.matchedLocation == '/signup';
 
       // Still resolving claims after a state change — don't redirect yet.
       if (appUserAsync.isLoading) return null;
@@ -42,17 +44,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       };
 
       if (appUser == null) {
-        return loggingIn ? null : '/login';
+        return (loggingIn || signingUp) ? null : '/login';
+      }
+      if (appUser.companyId.isEmpty) {
+        return signingUp ? null : '/signup';
       }
       if (!appUser.role.canAccessManagerApp) {
         return state.matchedLocation == '/access-denied' ? null : '/access-denied';
       }
-      if (loggingIn) return '/';
+      if (loggingIn || signingUp) return '/';
       return null;
     },
     routes: [
       GoRoute(path: '/', builder: (context, state) => const DashboardScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/signup', builder: (context, state) => const SignUpScreen()),
       GoRoute(
         path: '/access-denied',
         builder: (context, state) => const AccessDeniedScreen(),

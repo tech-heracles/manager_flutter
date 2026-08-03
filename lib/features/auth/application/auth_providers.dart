@@ -1,7 +1,9 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/auth_repository.dart';
 import '../data/claims_repository.dart';
+import '../data/company_repository.dart';
 import '../domain/app_user.dart';
 
 final authRepositoryProvider =
@@ -9,6 +11,10 @@ final authRepositoryProvider =
 
 final claimsRepositoryProvider =
     Provider<ClaimsRepository>((ref) => ClaimsRepository());
+
+final companyRepositoryProvider = Provider<CompanyRepository>(
+  (ref) => CompanyRepository(FirebaseFunctions.instance),
+);
 
 /// Raw Firebase sign-in/sign-out events.
 final authStateChangesProvider = StreamProvider<User?>((ref) {
