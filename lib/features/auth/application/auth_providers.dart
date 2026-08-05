@@ -6,14 +6,17 @@ import '../data/claims_repository.dart';
 import '../data/company_repository.dart';
 import '../domain/app_user.dart';
 
-final authRepositoryProvider =
-    Provider<AuthRepository>((ref) => AuthRepository(FirebaseAuth.instance));
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => AuthRepository(FirebaseAuth.instance),
+);
 
-final claimsRepositoryProvider =
-    Provider<ClaimsRepository>((ref) => ClaimsRepository());
+final claimsRepositoryProvider = Provider<ClaimsRepository>(
+  (ref) => ClaimsRepository(),
+);
 
 final companyRepositoryProvider = Provider<CompanyRepository>(
-  (ref) => CompanyRepository(FirebaseFunctions.instance),
+  (ref) =>
+      CompanyRepository(FirebaseFunctions.instanceFor(region: 'europe-west1')),
 );
 
 /// Raw Firebase sign-in/sign-out events.
