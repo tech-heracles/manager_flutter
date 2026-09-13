@@ -96,7 +96,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const Center(child: AppLogo()),
                   const SizedBox(height: 20),
                   Text(
-                    'Manager App',
+                    'Sign in',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
