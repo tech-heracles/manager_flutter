@@ -58,7 +58,6 @@ const _modules = [
     subtitle: 'Items, customers, categories',
     icon: Icons.dataset_rounded,
     route: '/master-data',
-    enabled: false,
   ),
   DashboardModule(
     title: 'Documents',

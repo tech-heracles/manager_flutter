@@ -10,6 +10,7 @@ import '../features/company_config/presentation/company_config_screen.dart';
 import '../features/erp_config/presentation/erp_config_screen.dart';
 import '../features/business_units/presentation/business_units_screen.dart';
 import '../features/users/presentation/users_screen.dart';
+import '../features/master_data/presentation/master_data_screen.dart';
 
 /// Notifies go_router to re-run its redirect on every raw Firebase auth
 /// change AND every time the derived app user (role/companyId claims)
@@ -83,6 +84,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/users',
         builder: (context, state) => const UsersScreen(),
+      ),
+      GoRoute(
+        path: '/master-data',
+        builder: (context, state) => const MasterDataScreen(),
       ),
     ],
   );
