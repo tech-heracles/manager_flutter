@@ -5,7 +5,9 @@ import '../data/erp_config_repository.dart';
 import '../domain/erp_config.dart';
 
 final erpConfigRepositoryProvider = Provider<ErpConfigRepository>(
-  (ref) => ErpConfigRepository(FirebaseFunctions.instance),
+  (ref) => ErpConfigRepository(
+    FirebaseFunctions.instanceFor(region: 'europe-west1'),
+  ),
 );
 
 final erpConfigProvider =
