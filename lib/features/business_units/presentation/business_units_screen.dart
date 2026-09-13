@@ -1,7 +1,10 @@
 // lib/features/business_units/presentation/business_units_screen.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme.dart';
+import '../../auth/application/auth_providers.dart';
+import '../../master_data/application/master_data_providers.dart';
 import '../application/business_unit_providers.dart';
 import '../domain/business_unit.dart';
 
@@ -91,12 +94,40 @@ class BusinessUnitsScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            unit.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  unit.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              if (unit.code != null && unit.code!.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.textMuted.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    unit.code!,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           if (unit.address != null && unit.address!.isNotEmpty)
                             Padding(
@@ -205,12 +236,45 @@ class _BusinessUnitFormDialogState
       TextEditingController(text: widget.existing?.name ?? '');
   late final _addressController =
       TextEditingController(text: widget.existing?.address ?? '');
+  late final _codeController =
+      TextEditingController(text: widget.existing?.code ?? '');
+  late String? _defaultCustomerCode = widget.existing?.defaultCustomerCode;
+  late String? _defaultLocationCode = widget.existing?.defaultLocationCode;
   bool _saving = false;
+  bool _loadingOptions = true;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _customers = [];
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _locations = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOptions();
+  }
+
+  Future<void> _loadOptions() async {
+    final companyId = ref.read(currentAppUserProvider).value?.companyId;
+    if (companyId == null || companyId.isEmpty) {
+      if (mounted) setState(() => _loadingOptions = false);
+      return;
+    }
+    final repo = ref.read(masterDataRepositoryProvider);
+    final results = await Future.wait([
+      repo.fetchPage(companyId: companyId, collection: 'CUSTOMER', sortField: 'code'),
+      repo.fetchPage(companyId: companyId, collection: 'LOCATION', sortField: 'code'),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _customers = results[0].docs;
+      _locations = results[1].docs;
+      _loadingOptions = false;
+    });
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -222,13 +286,24 @@ class _BusinessUnitFormDialogState
       final name = _nameController.text.trim();
       final address =
           _addressController.text.trim().isEmpty ? null : _addressController.text.trim();
+      final code =
+          _codeController.text.trim().isEmpty ? null : _codeController.text.trim();
       if (widget.existing == null) {
-        await repo.create(name: name, address: address);
+        await repo.create(
+          name: name,
+          address: address,
+          code: code,
+          defaultCustomerCode: _defaultCustomerCode,
+          defaultLocationCode: _defaultLocationCode,
+        );
       } else {
         await repo.update(
           businessUnitId: widget.existing!.id,
           name: name,
           address: address,
+          code: code,
+          defaultCustomerCode: _defaultCustomerCode,
+          defaultLocationCode: _defaultLocationCode,
         );
       }
       if (mounted) Navigator.of(context).pop();
@@ -255,21 +330,80 @@ class _BusinessUnitFormDialogState
         key: _formKey,
         child: SizedBox(
           width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Address'),
-              ),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(labelText: 'Address'),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _codeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Code',
+                    hintText: 'e.g. BAR1 (used by POS)',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (_loadingOptions)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: _customers.any((d) => d.id == _defaultCustomerCode)
+                        ? _defaultCustomerCode
+                        : null,
+                    decoration: const InputDecoration(labelText: 'Default customer'),
+                    dropdownColor: AppColors.surfaceHigh,
+                    items: _customers
+                        .map((d) => DropdownMenuItem(
+                              value: d.id,
+                              child: Text(
+                                (d.data()['description'] as String?)?.isNotEmpty == true
+                                    ? d.data()['description'] as String
+                                    : d.id,
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _defaultCustomerCode = v),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _locations.any((d) => d.id == _defaultLocationCode)
+                        ? _defaultLocationCode
+                        : null,
+                    decoration: const InputDecoration(labelText: 'Default location'),
+                    dropdownColor: AppColors.surfaceHigh,
+                    items: _locations
+                        .map((d) => DropdownMenuItem(
+                              value: d.id,
+                              child: Text(
+                                (d.data()['description'] as String?)?.isNotEmpty == true
+                                    ? d.data()['description'] as String
+                                    : d.id,
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _defaultLocationCode = v),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

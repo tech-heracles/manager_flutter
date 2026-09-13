@@ -19,11 +19,20 @@ class BusinessUnitRepository {
             snap.docs.map((d) => BusinessUnit.fromDoc(d.id, d.data())).toList());
   }
 
-  Future<void> create({required String name, String? address}) async {
+  Future<void> create({
+    required String name,
+    String? address,
+    String? code,
+    String? defaultCustomerCode,
+    String? defaultLocationCode,
+  }) async {
     final callable = _functions.httpsCallable('createBusinessUnit');
     await callable.call<Map<String, dynamic>>({
       'name': name,
       if (address != null) 'address': address,
+      if (code != null) 'code': code,
+      if (defaultCustomerCode != null) 'defaultCustomerCode': defaultCustomerCode,
+      if (defaultLocationCode != null) 'defaultLocationCode': defaultLocationCode,
     });
   }
 
@@ -31,12 +40,18 @@ class BusinessUnitRepository {
     required String businessUnitId,
     required String name,
     String? address,
+    String? code,
+    String? defaultCustomerCode,
+    String? defaultLocationCode,
   }) async {
     final callable = _functions.httpsCallable('updateBusinessUnit');
     await callable.call<Map<String, dynamic>>({
       'businessUnitId': businessUnitId,
       'name': name,
       'address': address,
+      'code': code,
+      'defaultCustomerCode': defaultCustomerCode,
+      'defaultLocationCode': defaultLocationCode,
     });
   }
 
