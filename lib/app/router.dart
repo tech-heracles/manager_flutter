@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,28 +11,25 @@ import '../features/erp_config/presentation/erp_config_screen.dart';
 import '../features/business_units/presentation/business_units_screen.dart';
 import '../features/users/presentation/users_screen.dart';
 
-/// Bridges a Stream into a Listenable so go_router knows when to
-/// re-evaluate redirects (every time Firebase auth state changes).
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    notifyListeners();
-    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
-  }
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
+/// Notifies go_router to re-run its redirect on every raw Firebase auth
+/// change AND every time the derived app user (role/companyId claims)
+/// finishes (re)loading. Listening only to auth state isn't enough: right
+/// after sign-in, currentAppUserProvider is still fetching claims, the
+/// redirect bails out early (isLoading), and nothing else would ever
+/// prompt go_router to check again — leaving the user stuck on /login.
+class _RouterRefreshNotifier extends ChangeNotifier {
+  _RouterRefreshNotifier(Ref ref) {
+    ref.listen(authStateChangesProvider, (_, _) => notifyListeners());
+    ref.listen(currentAppUserProvider, (_, _) => notifyListeners());
   }
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authRepository = ref.watch(authRepositoryProvider);
+  final refreshNotifier = _RouterRefreshNotifier(ref);
 
   return GoRouter(
     initialLocation: '/',
-    refreshListenable: GoRouterRefreshStream(authRepository.authStateChanges()),
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final appUserAsync = ref.read(currentAppUserProvider);
       final loggingIn = state.matchedLocation == '/login';
