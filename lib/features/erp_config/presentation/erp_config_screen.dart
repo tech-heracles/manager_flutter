@@ -47,6 +47,7 @@ class _ErpConfigScreenState extends ConsumerState<ErpConfigScreen> {
     _encrypt = config.encrypt;
     _trustServerCertificate = config.trustServerCertificate;
     _portController.text = config.port?.toString() ?? '';
+    _passwordController.text = config.password ?? '';
     _initialized = true;
   }
 
@@ -95,12 +96,6 @@ class _ErpConfigScreenState extends ConsumerState<ErpConfigScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password is required to save.')),
-      );
-      return;
-    }
 
     setState(() => _saving = true);
     try {
@@ -258,9 +253,7 @@ class _ErpConfigScreenState extends ConsumerState<ErpConfigScreen> {
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
-                            labelText: config.configured
-                                ? 'Password (leave empty to keep current)'
-                                : 'Password',
+                            labelText: 'Password',
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword
@@ -273,13 +266,8 @@ class _ErpConfigScreenState extends ConsumerState<ErpConfigScreen> {
                                   () => _obscurePassword = !_obscurePassword),
                             ),
                           ),
-                          validator: (v) {
-                            if (!config.configured &&
-                                (v == null || v.isEmpty)) {
-                              return 'Required';
-                            }
-                            return null;
-                          },
+                          validator: (v) =>
+                              (v == null || v.isEmpty) ? 'Required' : null,
                         ),
                       ],
                     ),

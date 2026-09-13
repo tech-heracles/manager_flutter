@@ -5,6 +5,7 @@ class ErpConfig {
     required this.server,
     required this.database,
     required this.user,
+    this.password,
     this.encrypt = false,
     this.trustServerCertificate = true,
     this.port,
@@ -16,6 +17,7 @@ class ErpConfig {
   final String server;
   final String database;
   final String user;
+  final String? password;
   final bool encrypt;
   final bool trustServerCertificate;
   final int? port;
@@ -38,6 +40,7 @@ class ErpConfig {
       server: config['server'] as String? ?? '',
       database: config['database'] as String? ?? '',
       user: config['user'] as String? ?? '',
+      password: config['password'] as String?,
       encrypt: config['encrypt'] as bool? ?? false,
       trustServerCertificate: config['trustServerCertificate'] as bool? ?? true,
       port: config['port'] as int?,
