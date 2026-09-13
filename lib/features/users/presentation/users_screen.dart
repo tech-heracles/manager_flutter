@@ -8,6 +8,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../auth/domain/user_role.dart';
 import '../../business_units/application/business_unit_providers.dart';
 import '../../business_units/domain/business_unit.dart';
+import '../../auth/domain/app_user.dart';
 import '../application/user_providers.dart';
 import '../domain/managed_user.dart';
 
@@ -17,6 +18,19 @@ const _roleLabels = {
   UserRole.operator: 'Operator',
 };
 
+/// Mirrors the firestore.rules gate on `users/{uid}/secure/credentials`:
+/// Admin sees everyone's PIN, a Supervisor only sees PINs for operators
+/// sharing one of their own business units, everyone can see their own.
+bool _canViewPin(AppUser? me, ManagedUser target) {
+  if (me == null || target.role != UserRole.operator) return false;
+  if (me.role == UserRole.admin) return true;
+  if (me.uid == target.uid) return true;
+  if (me.role == UserRole.supervisor) {
+    return target.businessUnitIds.any(me.businessUnitIds.contains);
+  }
+  return false;
+}
+
 class UsersScreen extends ConsumerWidget {
   const UsersScreen({super.key});
 
@@ -24,7 +38,8 @@ class UsersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(managedUsersStreamProvider);
     final unitsAsync = ref.watch(businessUnitsStreamProvider);
-    final currentUid = ref.watch(currentAppUserProvider).value?.uid;
+    final currentUser = ref.watch(currentAppUserProvider).value;
+    final currentUid = currentUser?.uid;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Users')),
@@ -83,9 +98,11 @@ class UsersScreen extends ConsumerWidget {
                 user: user,
                 unitNames: unitNames,
                 isSelf: isSelf,
+                canViewPin: _canViewPin(currentUser, user),
                 onEdit: () => _openEdit(context, ref, user),
                 onToggleActive: () => _confirmToggleActive(context, ref, user),
                 onResetPin: () => _openResetPin(context, user),
+                onShowPin: () => _openShowPin(context, ref, user),
               );
             },
           );
@@ -112,6 +129,19 @@ class UsersScreen extends ConsumerWidget {
     return showDialog(
       context: context,
       builder: (_) => _ResetPinDialog(user: user),
+    );
+  }
+
+  Future<void> _openShowPin(BuildContext context, WidgetRef ref, ManagedUser user) async {
+    final companyId = ref.read(currentAppUserProvider).value?.companyId;
+    if (companyId == null) return;
+    final future = ref.read(userRepositoryProvider).fetchPin(
+          companyId: companyId,
+          uid: user.uid,
+        );
+    return showDialog(
+      context: context,
+      builder: (_) => _PinLookupDialog(displayName: user.displayName, pinFuture: future),
     );
   }
 
@@ -167,17 +197,21 @@ class _UserTile extends StatelessWidget {
     required this.user,
     required this.unitNames,
     required this.isSelf,
+    required this.canViewPin,
     required this.onEdit,
     required this.onToggleActive,
     required this.onResetPin,
+    required this.onShowPin,
   });
 
   final ManagedUser user;
   final Map<String, String> unitNames;
   final bool isSelf;
+  final bool canViewPin;
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
   final VoidCallback onResetPin;
+  final VoidCallback onShowPin;
 
   @override
   Widget build(BuildContext context) {
@@ -277,10 +311,14 @@ class _UserTile extends StatelessWidget {
                   onToggleActive();
                 } else if (value == 'resetPin') {
                   onResetPin();
+                } else if (value == 'showPin') {
+                  onShowPin();
                 }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit role & units')),
+                if (user.role == UserRole.operator && canViewPin)
+                  const PopupMenuItem(value: 'showPin', child: Text('Show PIN')),
                 if (user.role == UserRole.operator)
                   const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
                 PopupMenuItem(
@@ -768,6 +806,76 @@ void _showPin(BuildContext context, String displayName, String pin) {
       ],
     ),
   );
+}
+
+class _PinLookupDialog extends StatelessWidget {
+  const _PinLookupDialog({required this.displayName, required this.pinFuture});
+  final String displayName;
+  final Future<String?> pinFuture;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('PIN — $displayName'),
+      content: SizedBox(
+        width: 260,
+        child: FutureBuilder<String?>(
+          future: pinFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                height: 40,
+                child: Center(
+                  child: SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            final pin = snapshot.data;
+            if (snapshot.hasError || pin == null) {
+              return const Text(
+                'PIN not found.',
+                style: TextStyle(color: AppColors.textSecondary),
+              );
+            }
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SelectableText(
+                  pin,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 4,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  tooltip: 'Copy',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: pin));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Copied to clipboard')),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Done'),
+        ),
+      ],
+    );
+  }
 }
 
 void _showResetLink(BuildContext context, String resetLink) {

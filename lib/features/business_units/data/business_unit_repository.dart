@@ -25,6 +25,9 @@ class BusinessUnitRepository {
     String? code,
     String? defaultCustomerCode,
     String? defaultLocationCode,
+    List<String>? visibleItemGroupCodes,
+    String salesMode = 'simple',
+    List<Zone> zones = const [],
   }) async {
     final callable = _functions.httpsCallable('createBusinessUnit');
     await callable.call<Map<String, dynamic>>({
@@ -33,6 +36,9 @@ class BusinessUnitRepository {
       if (code != null) 'code': code,
       if (defaultCustomerCode != null) 'defaultCustomerCode': defaultCustomerCode,
       if (defaultLocationCode != null) 'defaultLocationCode': defaultLocationCode,
+      'visibleItemGroupCodes': visibleItemGroupCodes,
+      'salesMode': salesMode,
+      'zones': zones.map((z) => z.toMap()).toList(),
     });
   }
 
@@ -43,6 +49,9 @@ class BusinessUnitRepository {
     String? code,
     String? defaultCustomerCode,
     String? defaultLocationCode,
+    List<String>? visibleItemGroupCodes,
+    String salesMode = 'simple',
+    List<Zone> zones = const [],
   }) async {
     final callable = _functions.httpsCallable('updateBusinessUnit');
     await callable.call<Map<String, dynamic>>({
@@ -52,6 +61,9 @@ class BusinessUnitRepository {
       'code': code,
       'defaultCustomerCode': defaultCustomerCode,
       'defaultLocationCode': defaultLocationCode,
+      'visibleItemGroupCodes': visibleItemGroupCodes,
+      'salesMode': salesMode,
+      'zones': zones.map((z) => z.toMap()).toList(),
     });
   }
 

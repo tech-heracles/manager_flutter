@@ -71,4 +71,20 @@ class UserRepository {
       'active': active,
     });
   }
+
+  /// Firestore rules scope this to: Admin, the operator themselves, or a
+  /// Supervisor who shares a business unit with them. Returns null if the
+  /// doc doesn't exist (or the read is denied — caller should gate on
+  /// [canViewPin] before calling this).
+  Future<String?> fetchPin({required String companyId, required String uid}) async {
+    final snap = await _firestore
+        .collection('companies')
+        .doc(companyId)
+        .collection('users')
+        .doc(uid)
+        .collection('secure')
+        .doc('credentials')
+        .get();
+    return snap.data()?['pin'] as String?;
+  }
 }
