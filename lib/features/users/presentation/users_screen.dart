@@ -1,4 +1,5 @@
 // lib/features/users/presentation/users_screen.dart
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,6 +85,7 @@ class UsersScreen extends ConsumerWidget {
                 isSelf: isSelf,
                 onEdit: () => _openEdit(context, ref, user),
                 onToggleActive: () => _confirmToggleActive(context, ref, user),
+                onResetPin: () => _openResetPin(context, user),
               );
             },
           );
@@ -103,6 +105,13 @@ class UsersScreen extends ConsumerWidget {
     return showDialog(
       context: context,
       builder: (_) => _EditUserDialog(user: user),
+    );
+  }
+
+  Future<void> _openResetPin(BuildContext context, ManagedUser user) {
+    return showDialog(
+      context: context,
+      builder: (_) => _ResetPinDialog(user: user),
     );
   }
 
@@ -160,6 +169,7 @@ class _UserTile extends StatelessWidget {
     required this.isSelf,
     required this.onEdit,
     required this.onToggleActive,
+    required this.onResetPin,
   });
 
   final ManagedUser user;
@@ -167,6 +177,7 @@ class _UserTile extends StatelessWidget {
   final bool isSelf;
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
+  final VoidCallback onResetPin;
 
   @override
   Widget build(BuildContext context) {
@@ -264,10 +275,14 @@ class _UserTile extends StatelessWidget {
                   onEdit();
                 } else if (value == 'toggle') {
                   onToggleActive();
+                } else if (value == 'resetPin') {
+                  onResetPin();
                 }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit role & units')),
+                if (user.role == UserRole.operator)
+                  const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
                 PopupMenuItem(
                   value: 'toggle',
                   child: Text(user.active ? 'Deactivate' : 'Activate'),
@@ -362,14 +377,24 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _nameController = TextEditingController();
+  final _pinController = TextEditingController();
   UserRole _role = UserRole.operator;
   Set<String> _selectedUnits = {};
   bool _saving = false;
+
+  bool get _isOperator => _role == UserRole.operator;
+
+  @override
+  void initState() {
+    super.initState();
+    _pinController.text = _generatePin();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _nameController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -380,16 +405,21 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
 
     setState(() => _saving = true);
     try {
-      final resetLink = await ref.read(userRepositoryProvider).invite(
+      final result = await ref.read(userRepositoryProvider).invite(
             companyId: appUser.companyId,
-            email: _emailController.text.trim(),
             displayName: _nameController.text.trim(),
             role: _role,
+            email: _isOperator ? null : _emailController.text.trim(),
+            pin: _isOperator ? _pinController.text.trim() : null,
             businessUnitIds: _selectedUnits.toList(),
           );
       if (mounted) {
         Navigator.of(context).pop();
-        _showResetLink(context, resetLink);
+        if (result.pin != null) {
+          _showPin(context, _nameController.text.trim(), result.pin!);
+        } else {
+          _showResetLink(context, result.resetLink ?? '');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -425,13 +455,34 @@ class _InviteUserDialogState extends ConsumerState<_InviteUserDialog> {
                       (v == null || v.trim().isEmpty) ? 'Required' : null,
                 ),
                 const SizedBox(height: 14),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (v) =>
-                      (v == null || !v.contains('@')) ? 'Valid email required' : null,
-                ),
+                if (_isOperator)
+                  TextFormField(
+                    controller: _pinController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      labelText: 'PIN (for POS login)',
+                      counterText: '',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.refresh, size: 20),
+                        tooltip: 'Generate a new PIN',
+                        onPressed: () =>
+                            setState(() => _pinController.text = _generatePin()),
+                      ),
+                    ),
+                    validator: (v) => (v == null || !RegExp(r'^\d{6}$').hasMatch(v))
+                        ? 'Must be exactly 6 digits'
+                        : null,
+                  )
+                else
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                    validator: (v) => (v == null || !v.contains('@'))
+                        ? 'Valid email required'
+                        : null,
+                  ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<UserRole>(
                   initialValue: _role,
@@ -575,6 +626,148 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
       ],
     );
   }
+}
+
+String _generatePin() {
+  final rand = Random();
+  return List.generate(6, (_) => rand.nextInt(10)).join();
+}
+
+class _ResetPinDialog extends ConsumerStatefulWidget {
+  const _ResetPinDialog({required this.user});
+  final ManagedUser user;
+
+  @override
+  ConsumerState<_ResetPinDialog> createState() => _ResetPinDialogState();
+}
+
+class _ResetPinDialogState extends ConsumerState<_ResetPinDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _pinController = TextEditingController(text: _generatePin());
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      final pin = _pinController.text.trim();
+      await ref.read(userRepositoryProvider).resetPin(
+            uid: widget.user.uid,
+            pin: pin,
+          );
+      if (mounted) {
+        Navigator.of(context).pop();
+        _showPin(context, widget.user.displayName, pin);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reset failed: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Reset PIN — ${widget.user.displayName}'),
+      content: Form(
+        key: _formKey,
+        child: SizedBox(
+          width: 320,
+          child: TextFormField(
+            controller: _pinController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: InputDecoration(
+              labelText: 'New PIN',
+              counterText: '',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                tooltip: 'Generate a new PIN',
+                onPressed: () => setState(() => _pinController.text = _generatePin()),
+              ),
+            ),
+            validator: (v) => (v == null || !RegExp(r'^\d{6}$').hasMatch(v))
+                ? 'Must be exactly 6 digits'
+                : null,
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+void _showPin(BuildContext context, String displayName, String pin) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('PIN set'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tell $displayName their PIN for logging into the POS:',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          SelectableText(
+            pin,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 4,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: pin));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Copied to clipboard')),
+            );
+          },
+          child: const Text('Copy'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  );
 }
 
 void _showResetLink(BuildContext context, String resetLink) {

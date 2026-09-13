@@ -20,24 +20,35 @@ class UserRepository {
             snap.docs.map((d) => ManagedUser.fromDoc(d.id, d.data())).toList());
   }
 
-  /// Returns the password-reset link so the Admin can share it with the
-  /// new operator (MVP: no outbound email yet).
-  Future<String> invite({
+  /// Admin/Supervisor accounts get a password-reset link to share (MVP: no
+  /// outbound email yet). Operators have no real email — they get a 6-digit
+  /// PIN the Admin sets directly, active immediately, meant for POS login.
+  Future<({String? resetLink, String? pin})> invite({
     required String companyId,
-    required String email,
     required String displayName,
     required UserRole role,
+    String? email,
+    String? pin,
     List<String> businessUnitIds = const [],
   }) async {
     final callable = _functions.httpsCallable('inviteUser');
     final result = await callable.call<Map<String, dynamic>>({
       'companyId': companyId,
-      'email': email,
       'displayName': displayName,
       'role': role.name,
       'businessUnitIds': businessUnitIds,
+      if (email != null) 'email': email,
+      if (pin != null) 'pin': pin,
     });
-    return result.data['resetLink'] as String? ?? '';
+    return (
+      resetLink: result.data['resetLink'] as String?,
+      pin: result.data['pin'] as String?,
+    );
+  }
+
+  Future<void> resetPin({required String uid, required String pin}) async {
+    final callable = _functions.httpsCallable('resetOperatorPin');
+    await callable.call<Map<String, dynamic>>({'uid': uid, 'pin': pin});
   }
 
   Future<void> updateUser({
