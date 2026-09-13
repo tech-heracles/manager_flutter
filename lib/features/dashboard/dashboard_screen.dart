@@ -46,7 +46,6 @@ const _modules = [
     subtitle: 'ERP integrations',
     icon: Icons.dns_rounded,
     route: '/erp-config',
-    enabled: false,
     requiresAdmin: true,
   ),
   DashboardModule(
@@ -86,8 +85,12 @@ class DashboardScreen extends ConsumerWidget {
           slivers: [
             SliverToBoxAdapter(
               child: _Header(
-                displayEmail: ref.watch(authRepositoryProvider).currentUser?.email,
-                onLogout: () => ref.read(authControllerProvider.notifier).logout(),
+                displayEmail: ref
+                    .watch(authRepositoryProvider)
+                    .currentUser
+                    ?.email,
+                onLogout: () =>
+                    ref.read(authControllerProvider.notifier).logout(),
               ),
             ),
             SliverPadding(
@@ -98,8 +101,8 @@ class DashboardScreen extends ConsumerWidget {
                   final columns = width > 900
                       ? 3
                       : width > 560
-                          ? 2
-                          : 1;
+                      ? 2
+                      : 1;
                   return SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columns,
@@ -107,22 +110,20 @@ class DashboardScreen extends ConsumerWidget {
                       crossAxisSpacing: 16,
                       childAspectRatio: 1.6,
                     ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final module = _modules[index];
-                        final locked = module.requiresAdmin &&
-                            role != null &&
-                            role != UserRole.admin;
-                        return _ModuleCard(
-                          module: module,
-                          locked: locked,
-                          onTap: (module.enabled && !locked)
-                              ? () => context.push(module.route)
-                              : null,
-                        );
-                      },
-                      childCount: _modules.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final module = _modules[index];
+                      final locked =
+                          module.requiresAdmin &&
+                          role != null &&
+                          role != UserRole.admin;
+                      return _ModuleCard(
+                        module: module,
+                        locked: locked,
+                        onTap: (module.enabled && !locked)
+                            ? () => context.push(module.route)
+                            : null,
+                      );
+                    }, childCount: _modules.length),
                   );
                 },
               ),
@@ -239,18 +240,25 @@ class _ModuleCardState extends State<_ModuleCard> {
                         ),
                         child: Icon(
                           module.icon,
-                          color: disabled ? AppColors.textMuted : AppColors.orange,
+                          color: disabled
+                              ? AppColors.textMuted
+                              : AppColors.orange,
                           size: 22,
                         ),
                       ),
                       const Spacer(),
                       if (widget.locked)
-                        const Icon(Icons.lock_outline,
-                            size: 16, color: AppColors.textMuted)
+                        const Icon(
+                          Icons.lock_outline,
+                          size: 16,
+                          color: AppColors.textMuted,
+                        )
                       else if (disabled)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceHighest,
                             borderRadius: BorderRadius.circular(6),
@@ -265,8 +273,11 @@ class _ModuleCardState extends State<_ModuleCard> {
                           ),
                         )
                       else
-                        const Icon(Icons.arrow_forward_rounded,
-                            size: 18, color: AppColors.textMuted),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: AppColors.textMuted,
+                        ),
                     ],
                   ),
                   const Spacer(),
@@ -275,7 +286,9 @@ class _ModuleCardState extends State<_ModuleCard> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: disabled ? AppColors.textMuted : AppColors.textPrimary,
+                      color: disabled
+                          ? AppColors.textMuted
+                          : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),

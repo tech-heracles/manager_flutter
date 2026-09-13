@@ -8,6 +8,7 @@ import '../features/auth/presentation/signup_screen.dart';
 import '../features/auth/presentation/access_denied_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/company_config/presentation/company_config_screen.dart';
+import '../features/erp_config/presentation/erp_config_screen.dart';
 
 /// Bridges a Stream into a Listenable so go_router knows when to
 /// re-evaluate redirects (every time Firebase auth state changes).
@@ -51,7 +52,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return signingUp ? null : '/signup';
       }
       if (!appUser.role.canAccessManagerApp) {
-        return state.matchedLocation == '/access-denied' ? null : '/access-denied';
+        return state.matchedLocation == '/access-denied'
+            ? null
+            : '/access-denied';
       }
       if (loggingIn || signingUp) return '/';
       return null;
@@ -59,13 +62,21 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (context, state) => const DashboardScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/signup', builder: (context, state) => const SignUpScreen()),
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) => const SignUpScreen(),
+      ),
       GoRoute(
         path: '/access-denied',
         builder: (context, state) => const AccessDeniedScreen(),
-      ),GoRoute(
+      ),
+      GoRoute(
         path: '/company-config',
         builder: (context, state) => const CompanyConfigScreen(),
+      ),
+      GoRoute(
+        path: '/erp-config',
+        builder: (context, state) => const ErpConfigScreen(),
       ),
     ],
   );
