@@ -13,7 +13,7 @@ final erpConfigProvider =
   ErpConfigController.new,
 );
 
-class ErpConfigController extends AutoDisposeAsyncNotifier<ErpConfig> {
+class ErpConfigController extends AsyncNotifier<ErpConfig> {
   @override
   Future<ErpConfig> build() {
     return ref.read(erpConfigRepositoryProvider).fetch();

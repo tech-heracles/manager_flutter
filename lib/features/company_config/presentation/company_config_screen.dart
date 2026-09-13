@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme.dart';
 import '../application/company_config_providers.dart';
-import '../data/company_config_repository.dart';
 import '../domain/company_config.dart';
 
 const _currencies = ['ALL', 'EUR', 'USD'];

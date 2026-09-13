@@ -9,6 +9,8 @@ import '../features/auth/presentation/access_denied_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/company_config/presentation/company_config_screen.dart';
 import '../features/erp_config/presentation/erp_config_screen.dart';
+import '../features/business_units/presentation/business_units_screen.dart';
+import '../features/users/presentation/users_screen.dart';
 
 /// Bridges a Stream into a Listenable so go_router knows when to
 /// re-evaluate redirects (every time Firebase auth state changes).
@@ -77,6 +79,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/erp-config',
         builder: (context, state) => const ErpConfigScreen(),
+      ),
+      GoRoute(
+        path: '/business-units',
+        builder: (context, state) => const BusinessUnitsScreen(),
+      ),
+      GoRoute(
+        path: '/users',
+        builder: (context, state) => const UsersScreen(),
       ),
     ],
   );

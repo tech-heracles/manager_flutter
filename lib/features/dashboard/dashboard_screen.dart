@@ -38,7 +38,6 @@ const _modules = [
     subtitle: 'Team members & roles',
     icon: Icons.groups_rounded,
     route: '/users',
-    enabled: false,
     requiresAdmin: true,
   ),
   DashboardModule(
@@ -53,7 +52,6 @@ const _modules = [
     subtitle: 'Locations & branches',
     icon: Icons.store_mall_directory_rounded,
     route: '/business-units',
-    enabled: false,
   ),
   DashboardModule(
     title: 'Master Data',
