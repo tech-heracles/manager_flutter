@@ -9,6 +9,7 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/company_config/presentation/company_config_screen.dart';
 import '../features/erp_config/presentation/erp_config_screen.dart';
 import '../features/business_units/presentation/business_units_screen.dart';
+import '../features/business_units/presentation/business_unit_edit_screen.dart';
 import '../features/users/presentation/users_screen.dart';
 import '../features/master_data/presentation/master_data_screen.dart';
 
@@ -80,6 +81,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/business-units',
         builder: (context, state) => const BusinessUnitsScreen(),
+      ),
+      GoRoute(
+        path: '/business-units/new',
+        builder: (context, state) => const BusinessUnitEditScreen(),
+      ),
+      GoRoute(
+        path: '/business-units/:id',
+        builder: (context, state) =>
+            BusinessUnitEditScreen(businessUnitId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/users',

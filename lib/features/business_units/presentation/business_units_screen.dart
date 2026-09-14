@@ -1,10 +1,8 @@
 // lib/features/business_units/presentation/business_units_screen.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
-import '../../auth/application/auth_providers.dart';
-import '../../master_data/application/master_data_providers.dart';
 import '../application/business_unit_providers.dart';
 import '../domain/business_unit.dart';
 
@@ -14,11 +12,12 @@ class BusinessUnitsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unitsAsync = ref.watch(businessUnitsStreamProvider);
+    final compact = MediaQuery.sizeOf(context).width < 600;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Business Units')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openForm(context, ref),
+        onPressed: () => context.push('/business-units/new'),
         icon: const Icon(Icons.add),
         label: const Text('Add'),
       ),
@@ -52,7 +51,7 @@ class BusinessUnitsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     FilledButton(
-                      onPressed: () => _openForm(context, ref),
+                      onPressed: () => context.push('/business-units/new'),
                       child: const Text('Add the first one'),
                     ),
                   ],
@@ -61,120 +60,26 @@ class BusinessUnitsScreen extends ConsumerWidget {
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
+            padding: EdgeInsets.fromLTRB(
+              compact ? 12 : 20,
+              12,
+              compact ? 12 : 20,
+              96,
+            ),
             itemCount: units.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            separatorBuilder: (_, _) => SizedBox(height: compact ? 6 : 10),
             itemBuilder: (context, index) {
               final unit = units[index];
-              return Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.orange.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.store_mall_directory_rounded,
-                        color: AppColors.orange,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  unit.name,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              if (unit.code != null && unit.code!.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.textMuted.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    unit.code!,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          if (unit.address != null && unit.address!.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                unit.address!,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, color: AppColors.textMuted),
-                      onSelected: (value) {
-                        if (value == 'edit') {
-                          _openForm(context, ref, existing: unit);
-                        } else if (value == 'delete') {
-                          _confirmDelete(context, ref, unit);
-                        }
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        PopupMenuItem(value: 'delete', child: Text('Delete')),
-                      ],
-                    ),
-                  ],
-                ),
+              return _BusinessUnitCard(
+                unit: unit,
+                compact: compact,
+                onTap: () => context.push('/business-units/${unit.id}'),
+                onDelete: () => _confirmDelete(context, ref, unit),
               );
             },
           );
         },
       ),
-    );
-  }
-
-  Future<void> _openForm(
-    BuildContext context,
-    WidgetRef ref, {
-    BusinessUnit? existing,
-  }) {
-    return showDialog(
-      context: context,
-      builder: (_) => _BusinessUnitFormDialog(existing: existing),
     );
   }
 
@@ -220,476 +125,146 @@ class BusinessUnitsScreen extends ConsumerWidget {
   }
 }
 
-class _BusinessUnitFormDialog extends ConsumerStatefulWidget {
-  const _BusinessUnitFormDialog({this.existing});
-  final BusinessUnit? existing;
+class _BusinessUnitCard extends StatelessWidget {
+  const _BusinessUnitCard({
+    required this.unit,
+    required this.compact,
+    required this.onTap,
+    required this.onDelete,
+  });
 
-  @override
-  ConsumerState<_BusinessUnitFormDialog> createState() =>
-      _BusinessUnitFormDialogState();
-}
-
-class _TableDraft {
-  _TableDraft({required this.id, this.name = ''});
-  final String id;
-  String name;
-}
-
-class _ZoneDraft {
-  _ZoneDraft({required this.id, this.name = '', List<_TableDraft>? tables})
-      : tables = tables ?? [];
-  final String id;
-  String name;
-  List<_TableDraft> tables;
-}
-
-String _newDraftId() => DateTime.now().microsecondsSinceEpoch.toString();
-
-class _BusinessUnitFormDialogState
-    extends ConsumerState<_BusinessUnitFormDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final _nameController =
-      TextEditingController(text: widget.existing?.name ?? '');
-  late final _addressController =
-      TextEditingController(text: widget.existing?.address ?? '');
-  late final _codeController =
-      TextEditingController(text: widget.existing?.code ?? '');
-  late String? _defaultCustomerCode = widget.existing?.defaultCustomerCode;
-  late String? _defaultLocationCode = widget.existing?.defaultLocationCode;
-  late Set<String>? _visibleGroupCodes = widget.existing?.visibleItemGroupCodes?.toSet();
-  late String _salesMode = widget.existing?.salesMode ?? 'simple';
-  late List<_ZoneDraft> _zones = (widget.existing?.zones ?? const [])
-      .map((z) => _ZoneDraft(
-            id: z.id,
-            name: z.name,
-            tables: z.tables.map((t) => _TableDraft(id: t.id, name: t.name)).toList(),
-          ))
-      .toList();
-  bool _saving = false;
-  bool _loadingOptions = true;
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> _customers = [];
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> _locations = [];
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> _itemGroups = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadOptions();
-  }
-
-  Future<void> _loadOptions() async {
-    final companyId = ref.read(currentAppUserProvider).value?.companyId;
-    if (companyId == null || companyId.isEmpty) {
-      if (mounted) setState(() => _loadingOptions = false);
-      return;
-    }
-    final repo = ref.read(masterDataRepositoryProvider);
-    final results = await Future.wait([
-      repo.fetchPage(companyId: companyId, collection: 'CUSTOMER', sortField: 'code'),
-      repo.fetchPage(companyId: companyId, collection: 'LOCATION', sortField: 'code'),
-      repo.fetchPage(companyId: companyId, collection: 'ITEM_GROUP', sortField: 'code'),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _customers = results[0].docs;
-      _locations = results[1].docs;
-      _itemGroups = results[2].docs;
-      _loadingOptions = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _addressController.dispose();
-    _codeController.dispose();
-    super.dispose();
-  }
-
-  List<String>? get _visibleGroupCodesToSave {
-    if (_visibleGroupCodes == null) return null;
-    if (_itemGroups.isNotEmpty && _visibleGroupCodes!.length == _itemGroups.length) {
-      return null; // everything selected == no restriction
-    }
-    return _visibleGroupCodes!.toList();
-  }
-
-  List<Zone> get _zonesToSave => _zones
-      .where((z) => z.name.trim().isNotEmpty)
-      .map((z) => Zone(
-            id: z.id,
-            name: z.name.trim(),
-            tables: z.tables
-                .where((t) => t.name.trim().isNotEmpty)
-                .map((t) => ZoneTable(id: t.id, name: t.name.trim()))
-                .toList(),
-          ))
-      .toList();
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
-    try {
-      final repo = ref.read(businessUnitRepositoryProvider);
-      final name = _nameController.text.trim();
-      final address =
-          _addressController.text.trim().isEmpty ? null : _addressController.text.trim();
-      final code =
-          _codeController.text.trim().isEmpty ? null : _codeController.text.trim();
-      if (widget.existing == null) {
-        await repo.create(
-          name: name,
-          address: address,
-          code: code,
-          defaultCustomerCode: _defaultCustomerCode,
-          defaultLocationCode: _defaultLocationCode,
-          visibleItemGroupCodes: _visibleGroupCodesToSave,
-          salesMode: _salesMode,
-          zones: _zonesToSave,
-        );
-      } else {
-        await repo.update(
-          businessUnitId: widget.existing!.id,
-          name: name,
-          address: address,
-          code: code,
-          defaultCustomerCode: _defaultCustomerCode,
-          defaultLocationCode: _defaultLocationCode,
-          visibleItemGroupCodes: _visibleGroupCodesToSave,
-          salesMode: _salesMode,
-          zones: _zonesToSave,
-        );
-      }
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Save failed: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
+  final BusinessUnit unit;
+  final bool compact;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final isEdit = widget.existing != null;
-    return AlertDialog(
-      title: Text(isEdit ? 'Edit business unit' : 'Add business unit'),
-      content: Form(
-        key: _formKey,
-        child: SizedBox(
-          width: 360,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Required' : null,
+    final iconSize = compact ? 32.0 : 40.0;
+    final isTablesMode = unit.salesMode == 'tables';
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(compact ? 12 : 14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(compact ? 12 : 14),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(compact ? 12 : 14),
+            border: Border.all(color: AppColors.border),
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 16,
+            vertical: compact ? 6 : 4,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: iconSize,
+                height: iconSize,
+                decoration: BoxDecoration(
+                  color: AppColors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _addressController,
-                  decoration: const InputDecoration(labelText: 'Address'),
+                child: Icon(
+                  isTablesMode
+                      ? Icons.table_bar_rounded
+                      : Icons.store_mall_directory_rounded,
+                  color: AppColors.orange,
+                  size: compact ? 16 : 20,
                 ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _codeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Code',
-                    hintText: 'e.g. BAR1 (used by POS)',
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (_loadingOptions)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: compact ? 10 : 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            unit.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: compact ? 13.5 : 14,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        if (unit.code != null && unit.code!.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          _Tag(label: unit.code!),
+                        ],
+                      ],
                     ),
-                  )
-                else ...[
-                  DropdownButtonFormField<String>(
-                    initialValue: _customers.any((d) => d.id == _defaultCustomerCode)
-                        ? _defaultCustomerCode
-                        : null,
-                    decoration: const InputDecoration(labelText: 'Default customer'),
-                    dropdownColor: AppColors.surfaceHigh,
-                    items: _customers
-                        .map((d) => DropdownMenuItem(
-                              value: d.id,
-                              child: Text(
-                                (d.data()['description'] as String?)?.isNotEmpty == true
-                                    ? d.data()['description'] as String
-                                    : d.id,
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _defaultCustomerCode = v),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: _locations.any((d) => d.id == _defaultLocationCode)
-                        ? _defaultLocationCode
-                        : null,
-                    decoration: const InputDecoration(labelText: 'Default location'),
-                    dropdownColor: AppColors.surfaceHigh,
-                    items: _locations
-                        .map((d) => DropdownMenuItem(
-                              value: d.id,
-                              child: Text(
-                                (d.data()['description'] as String?)?.isNotEmpty == true
-                                    ? d.data()['description'] as String
-                                    : d.id,
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _defaultLocationCode = v),
-                  ),
-                  const SizedBox(height: 18),
-                  const Divider(),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Visible item groups',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  const Text(
-                    'All are shown to operators by default — untick any you want hidden in POS.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                  ),
-                  const SizedBox(height: 4),
-                  _ItemGroupCheckboxList(
-                    groups: _itemGroups,
-                    selected: _visibleGroupCodes ?? _itemGroups.map((d) => d.id).toSet(),
-                    onChanged: (next) => setState(() => _visibleGroupCodes = next),
-                  ),
-                  const SizedBox(height: 18),
-                  const Divider(),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Sales mode',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'simple', label: Text('Simple')),
-                      ButtonSegment(value: 'tables', label: Text('Bar / Restaurant')),
-                    ],
-                    selected: {_salesMode},
-                    onSelectionChanged: (next) => setState(() => _salesMode = next.first),
-                  ),
-                  if (_salesMode == 'tables') ...[
-                    const SizedBox(height: 14),
-                    _ZonesEditor(
-                      zones: _zones,
-                      onChanged: (next) => setState(() => _zones = next),
-                    ),
+                    if (!compact && unit.address != null && unit.address!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          unit.address!,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    if (isTablesMode)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Bar / Restaurant · ${unit.zones.length} zone${unit.zones.length == 1 ? '' : 's'}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.orange),
+                        ),
+                      ),
                   ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: AppColors.textMuted, size: compact ? 18 : 20),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    onTap();
+                  } else if (value == 'delete') {
+                    onDelete();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(value: 'delete', child: Text('Delete')),
                 ],
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: _saving
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(isEdit ? 'Save' : 'Add'),
-        ),
-      ],
     );
   }
 }
 
-class _ItemGroupCheckboxList extends StatelessWidget {
-  const _ItemGroupCheckboxList({
-    required this.groups,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final List<QueryDocumentSnapshot<Map<String, dynamic>>> groups;
-  final Set<String> selected;
-  final ValueChanged<Set<String>> onChanged;
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label});
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    if (groups.isEmpty) {
-      return const Text(
-        'No item groups synced yet.',
-        style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
-      );
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final doc in groups)
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            dense: true,
-            activeColor: AppColors.orange,
-            title: Text(
-              (doc.data()['description'] as String?)?.isNotEmpty == true
-                  ? doc.data()['description'] as String
-                  : doc.id,
-              style: const TextStyle(color: AppColors.textPrimary),
-            ),
-            value: selected.contains(doc.id),
-            onChanged: (checked) {
-              final next = Set<String>.from(selected);
-              if (checked == true) {
-                next.add(doc.id);
-              } else {
-                next.remove(doc.id);
-              }
-              onChanged(next);
-            },
-          ),
-      ],
-    );
-  }
-}
-
-class _ZonesEditor extends StatefulWidget {
-  const _ZonesEditor({required this.zones, required this.onChanged});
-  final List<_ZoneDraft> zones;
-  final ValueChanged<List<_ZoneDraft>> onChanged;
-
-  @override
-  State<_ZonesEditor> createState() => _ZonesEditorState();
-}
-
-class _ZonesEditorState extends State<_ZonesEditor> {
-  late List<_ZoneDraft> _zones = widget.zones;
-
-  void _notify() => widget.onChanged(_zones);
-
-  void _addZone() {
-    setState(() => _zones = [..._zones, _ZoneDraft(id: _newDraftId())]);
-    _notify();
-  }
-
-  void _removeZone(_ZoneDraft zone) {
-    setState(() => _zones = _zones.where((z) => z.id != zone.id).toList());
-    _notify();
-  }
-
-  void _addTable(_ZoneDraft zone) {
-    setState(() => zone.tables = [...zone.tables, _TableDraft(id: _newDraftId())]);
-    _notify();
-  }
-
-  void _removeTable(_ZoneDraft zone, _TableDraft table) {
-    setState(() => zone.tables = zone.tables.where((t) => t.id != table.id).toList());
-    _notify();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final zone in _zones)
-          Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceHigh,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        key: ValueKey('zone-name-${zone.id}'),
-                        initialValue: zone.name,
-                        decoration: const InputDecoration(labelText: 'Zone name', isDense: true),
-                        onChanged: (v) {
-                          zone.name = v;
-                          _notify();
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
-                      tooltip: 'Remove zone',
-                      onPressed: () => _removeZone(zone),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    for (final table in zone.tables)
-                      SizedBox(
-                        width: 130,
-                        child: TextFormField(
-                          key: ValueKey('table-name-${table.id}'),
-                          initialValue: table.name,
-                          decoration: InputDecoration(
-                            labelText: 'Table',
-                            isDense: true,
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.close, size: 16),
-                              onPressed: () => _removeTable(zone, table),
-                            ),
-                          ),
-                          onChanged: (v) {
-                            table.name = v;
-                            _notify();
-                          },
-                        ),
-                      ),
-                    OutlinedButton.icon(
-                      onPressed: () => _addTable(zone),
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Table'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        OutlinedButton.icon(
-          onPressed: _addZone,
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('Add zone'),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.textMuted.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textMuted,
         ),
-      ],
+      ),
     );
   }
 }
